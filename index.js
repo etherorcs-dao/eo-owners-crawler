@@ -5,6 +5,7 @@ import async from 'async';
 import cron from 'node-cron';
 import './config.js';
 import Big from 'big.js';
+import express from 'express';
 import {
   EthAlliesContract,
   EthCampaignAContract,
@@ -80,6 +81,9 @@ const races = [
     totalSupply: ROGUES_TOTAL_SUPPLY,
   },
 ];
+
+const app = express();
+const port = 3000;
 
 let polyCampaignAContract;
 let ethAlliesContract;
@@ -186,8 +190,8 @@ async function crawlAllies(allyRace) {
       } catch (error) {
         if (
           error
-          && error.message
-          && !error.message.includes('Returned error: execution reverted')
+                    && error.message
+                    && !error.message.includes('Returned error: execution reverted')
         ) {
           console.error(allyNum, error);
           throw error;
@@ -208,7 +212,7 @@ async function crawlAllies(allyRace) {
       let parsedMetadata;
       // Bridging
       if (owner?.toLowerCase() === POLY_CASTLE_CONTRACT_ADDRESS.toLowerCase()
-      && ethCastleOwner !== undefined) {
+                && ethCastleOwner !== undefined) {
         owner = ethCastleOwner;
         inBridge = true;
       }
@@ -246,11 +250,12 @@ async function crawlAllies(allyRace) {
           'base64',
         ).toString();
         parsedMetadata = JSON.parse(decodedMetadata);
-      } catch (err) {}
+      } catch (err) {
+      }
       if (
         network === 'polygon'
-        && activities !== undefined
-        && activities !== null
+                && activities !== undefined
+                && activities !== null
       ) {
         activities.timestamp = parseInt(activities.timestamp, 10);
 
@@ -266,7 +271,7 @@ async function crawlAllies(allyRace) {
       }
       if (
         network === 'polygon'
-        && commanders !== '0x0000000000000000000000000000000000000000'
+                && commanders !== '0x0000000000000000000000000000000000000000'
       ) {
         // Ally is raiding
         actualOwner = commanders;
@@ -324,11 +329,11 @@ async function crawlAllies(allyRace) {
         activities,
         claimable: claimable === null ? 0 : new Big(claimable).toFixed(8),
         owner:
-          actualOwner === null
-          || actualOwner === undefined
-          || typeof actualOwner !== 'string'
-            ? actualOwner
-            : actualOwner.toLowerCase(),
+                    actualOwner === null
+                    || actualOwner === undefined
+                    || typeof actualOwner !== 'string'
+                      ? actualOwner
+                      : actualOwner.toLowerCase(),
         allyNum,
         ally,
         inBridge,
@@ -410,8 +415,8 @@ async function crawlOrcs() {
       } catch (error) {
         if (
           error
-          && error.message
-          && !error.message.includes('Returned error: execution reverted')
+                    && error.message
+                    && !error.message.includes('Returned error: execution reverted')
         ) {
           console.error(orcNum, error);
           throw error;
@@ -421,7 +426,7 @@ async function crawlOrcs() {
       let parsedMetadata;
       // Bridging
       if (owner?.toLowerCase() === POLY_CASTLE_CONTRACT_ADDRESS.toLowerCase()
-      && ethCastleOwner !== undefined) {
+                && ethCastleOwner !== undefined) {
         owner = ethCastleOwner;
         inBridge = true;
       }
@@ -459,7 +464,8 @@ async function crawlOrcs() {
           'base64',
         ).toString();
         parsedMetadata = JSON.parse(decodedMetadata);
-      } catch (err) {}
+      } catch (err) {
+      }
       if (activities !== undefined && activities !== null) {
         activities.timestamp = parseInt(activities.timestamp, 10);
         // End of legacy farming
@@ -499,7 +505,7 @@ async function crawlOrcs() {
         if (isInFarmingContract && lastFarmingSession) {
           const parsedStartTime = parseInt(lastFarmingSession.startTime, 10);
           if (lastFarmingSession.endTime !== null
-            || (orcFarmingConfig && (parsedStartTime + parseInt(orcFarmingConfig.config.maximumTimeFarmingCap, 10)) <= parseInt(Date.now() / 1000, 10))
+                        || (orcFarmingConfig && (parsedStartTime + parseInt(orcFarmingConfig.config.maximumTimeFarmingCap, 10)) <= parseInt(Date.now() / 1000, 10))
           ) {
             zugPerDay = 0;
           } else if (lastFarmingSession.boost === '0') {
@@ -520,11 +526,11 @@ async function crawlOrcs() {
         activities,
         claimable: claimable === null ? 0 : new Big(claimable).toFixed(8),
         owner:
-          actualOwner === null
-          || actualOwner === undefined
-          || typeof actualOwner !== 'string'
-            ? actualOwner
-            : actualOwner.toLowerCase(),
+                    actualOwner === null
+                    || actualOwner === undefined
+                    || typeof actualOwner !== 'string'
+                      ? actualOwner
+                      : actualOwner.toLowerCase(),
         orc,
         orcNum,
         metadata: parsedMetadata,
@@ -545,11 +551,78 @@ async function crawlOrcs() {
   };
 }
 
-async function main() {
-  await mongoClient.connect();
-  const database = mongoClient.db(process.env.MONGO_DB);
+let database;
 
+async function fetch() {
   const orcsCollection = database.collection('orcs');
+
+  farmingSessions = await getFarmingSessions();
+  farmingConfigs = await getFarmingConfigs();
+  console.log('Start cron job');
+  if (ETH_ORCS_CONTRACT_ADDRESS !== '' && POLY_ORCS_CONTRACT_ADDRESS !== '') {
+    try {
+      const assets = await crawlOrcs();
+      if (assets?.orcs.length === assets?.supply) { // complete
+        console.log(`Persisting ${assets?.orcs.length} orcs to db`);
+        const bulkAssets = assets.orcs.map((doc) => ({
+          updateOne: {
+            filter: { _id: doc.orcNum },
+            update: { $set: doc },
+            upsert: true,
+          },
+        }));
+        await orcsCollection
+          .bulkWrite(bulkAssets)
+          .catch((error) => console.error(error));
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  }
+  if (
+    ETH_ALLIES_CONTRACT_ADDRESS !== ''
+            && POLY_ALLIES_CONTRACT_ADDRESS !== ''
+  ) {
+    try {
+      const allyRaces = races.filter((race) => race.type === 'ally');
+      await Promise.all(allyRaces.map(async (allyRace) => {
+        const { dbCollectionName, race } = allyRace;
+        const assets = await crawlAllies(allyRace).catch((error) => console.error(error));
+        const validAssets = assets?.filter((asset) => asset !== undefined);
+        console.log(`Total valid ${race}s: ${validAssets?.length}`);
+        if (validAssets?.length > 0) {
+          const bulkAssets = validAssets.map((doc) => ({
+            updateOne: {
+              filter: { _id: doc.allyNum },
+              update: { $set: doc },
+              upsert: true,
+            },
+          }));
+          await database.collection(dbCollectionName)
+            .bulkWrite(bulkAssets)
+            .catch((error) => console.error(error));
+          console.log(`Persisted ${validAssets.length} ${race}s`);
+        }
+      }));
+    } catch (error) {
+      console.error(error);
+    }
+  }
+  console.log('End cron job');
+}
+
+app.get('/fetch', (req, res) => {
+  fetch().then((res) => {
+    res.status(200).json({ success: true });
+  }).catch((err) => {
+    console.error(err);
+    res.status(500).json({ success: false });
+  });
+});
+
+async function init() {
+  await mongoClient.connect();
+  database = mongoClient.db(process.env.MONGO_DB);
 
   polyCampaignAContract = await PolyCampaignAContract();
   ethAlliesContract = await EthAlliesContract();
@@ -559,63 +632,10 @@ async function main() {
   polyOrcsContract = await PolyOrcsContract();
   ethCampaignAContract = await EthCampaignAContract();
   polyDCContract = await PolyDCContract();
-
-  // while (true) {
-  cron.schedule(CRON_SCHEDULE, async () => {
-    farmingSessions = await getFarmingSessions();
-    farmingConfigs = await getFarmingConfigs();
-    console.log('Start cron job');
-    if (ETH_ORCS_CONTRACT_ADDRESS !== '' && POLY_ORCS_CONTRACT_ADDRESS !== '') {
-      try {
-        const assets = await crawlOrcs();
-        if (assets?.orcs.length === assets?.supply) { // complete
-          console.log(`Persisting ${assets?.orcs.length} orcs to db`);
-          const bulkAssets = assets.orcs.map((doc) => ({
-            updateOne: {
-              filter: { _id: doc.orcNum },
-              update: { $set: doc },
-              upsert: true,
-            },
-          }));
-          await orcsCollection
-            .bulkWrite(bulkAssets)
-            .catch((error) => console.error(error));
-        }
-      } catch (error) {
-        console.error(error);
-      }
-    }
-    if (
-      ETH_ALLIES_CONTRACT_ADDRESS !== ''
-      && POLY_ALLIES_CONTRACT_ADDRESS !== ''
-    ) {
-      try {
-        const allyRaces = races.filter((race) => race.type === 'ally');
-        await Promise.all(allyRaces.map(async (allyRace) => {
-          const { dbCollectionName, race } = allyRace;
-          const assets = await crawlAllies(allyRace).catch((error) => console.error(error));
-          const validAssets = assets?.filter((asset) => asset !== undefined);
-          console.log(`Total valid ${race}s: ${validAssets?.length}`);
-          if (validAssets?.length > 0) {
-            const bulkAssets = validAssets.map((doc) => ({
-              updateOne: {
-                filter: { _id: doc.allyNum },
-                update: { $set: doc },
-                upsert: true,
-              },
-            }));
-            await database.collection(dbCollectionName)
-              .bulkWrite(bulkAssets)
-              .catch((error) => console.error(error));
-            console.log(`Persisted ${validAssets.length} ${race}s`);
-          }
-        }));
-      } catch (error) {
-        console.error(error);
-      }
-    }
-    console.log('End cron job');
-  });
 }
 
-main();
+app.listen(port, () => {
+  init().then((r) => {
+    console.log(`App listening on port ${port}`);
+  });
+});
