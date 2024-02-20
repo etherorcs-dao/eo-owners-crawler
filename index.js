@@ -611,15 +611,6 @@ async function fetch() {
   console.log('End cron job');
 }
 
-app.get('/fetch', (req, res) => {
-  fetch().then((res) => {
-    res.status(200).json({ success: true });
-  }).catch((err) => {
-    console.error(err);
-    res.status(500).json({ success: false });
-  });
-});
-
 async function init() {
   await mongoClient.connect();
   database = mongoClient.db(process.env.MONGO_DB);
@@ -634,8 +625,4 @@ async function init() {
   polyDCContract = await PolyDCContract();
 }
 
-app.listen(port, () => {
-  init().then((r) => {
-    console.log(`App listening on port ${port}`);
-  });
-});
+export { fetch, init };
