@@ -545,7 +545,7 @@ async function crawlOrcs() {
   };
 }
 
-async function main() {
+export async function crawl() {
   await mongoClient.connect();
   const database = mongoClient.db(process.env.MONGO_DB);
 
@@ -617,5 +617,3 @@ async function main() {
     console.log('End cron job');
   });
 }
-
-main();
