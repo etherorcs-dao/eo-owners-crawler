@@ -17,10 +17,10 @@
       "dest": "dist/index.js"
     }
   ],
-  "crons": [
+ /* "crons": [
     {
       "path": "/cron",
-      "schedule": "*/3 * * * *"
+      "schedule": "*//*3 * * * *"
     }
-  ]
+  ]*/
 }

@@ -545,7 +545,7 @@ async function crawlOrcs() {
   };
 }
 
-export async function crawl() {
+async function main() {
   await mongoClient.connect();
   const database = mongoClient.db(process.env.MONGO_DB);
 
@@ -560,6 +560,8 @@ export async function crawl() {
   ethCampaignAContract = await EthCampaignAContract();
   polyDCContract = await PolyDCContract();
 
+  // while (true) {
+  cron.schedule(CRON_SCHEDULE, async () => {
     farmingSessions = await getFarmingSessions();
     farmingConfigs = await getFarmingConfigs();
     console.log('Start cron job');
@@ -613,4 +615,7 @@ export async function crawl() {
       }
     }
     console.log('End cron job');
+  });
 }
+
+main();
