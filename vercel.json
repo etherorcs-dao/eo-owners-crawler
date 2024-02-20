@@ -19,8 +19,9 @@
   ],
   "crons": [
     {
-      "path": "/fetch",
+      "path": "/api/fetch",
       "schedule": "*/3 * * * *"
     }
-  ]
+  ],
+  "rewrites": [{ "source": "/api/(.*)", "destination": "/api" }]
 }
