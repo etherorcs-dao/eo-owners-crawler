@@ -83,7 +83,7 @@ const races = [
 ];
 
 const app = express();
-const port = 8080;
+const port = 80;
 
 let polyCampaignAContract;
 let ethAlliesContract;
