@@ -1,10 +1,11 @@
-import express from 'express';
-import {fetch, init} from '../index.js';
+import {fetch, init} from "@/core.js";
 
-express.get('/api/fetch', (req, res) => {
+export const dynamic = 'force-dynamic'; // static by default, unless reading the request
+
+export default function handler(req, res) {
   init().then(() => {
     fetch().then((res1) => {
-        console.log(res1);
+      console.log(res1);
       res1.status(200).json({ success: true });
     }).catch((err) => {
       console.error(err);
@@ -13,4 +14,4 @@ express.get('/api/fetch', (req, res) => {
   }).catch(() => {
     res.status(500).json({ success: false });
   });
-});
+}
