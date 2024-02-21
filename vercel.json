@@ -6,7 +6,7 @@
     }
   ],
   "functions": {
-    "api/fetch.js": {
+    "pages/api/fetch.js": {
       "maxDuration": 300
     }
   }
