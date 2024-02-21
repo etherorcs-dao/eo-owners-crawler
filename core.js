@@ -554,10 +554,9 @@ async function crawlOrcs() {
 let database;
 
 async function fetch() {
-  const orcsCollection = database.collection('orcs');
-
   farmingSessions = await getFarmingSessions();
   farmingConfigs = await getFarmingConfigs();
+    const orcsCollection = database.collection('orcs');
   console.log('Start cron job');
   if (ETH_ORCS_CONTRACT_ADDRESS !== '' && POLY_ORCS_CONTRACT_ADDRESS !== '') {
     try {

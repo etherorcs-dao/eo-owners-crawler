@@ -38,6 +38,7 @@ export async function getFarmingSessions() {
         },
       },
     );
+    console.log(response)
     if (response.data.data === undefined) {
       break;
     }

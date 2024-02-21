@@ -4,5 +4,10 @@
       "path": "/api/fetch",
       "schedule": "*/3 * * * *"
     }
-  ]
+  ],
+  "functions": {
+    "api/fetch.js": {
+      "maxDuration": 600
+    }
+  }
 }
